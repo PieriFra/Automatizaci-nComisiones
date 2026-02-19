@@ -1,5 +1,7 @@
 import pytesseract
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 from pdf2image import convert_from_path
+POPPLER_PATH = r"C:\Users\Usuario\Release-25.12.0-0\poppler-25.12.0\Library\bin"
 import re
 import os
 import pandas as pd
@@ -15,7 +17,7 @@ def extraer_texto_pdf(pdf_path):
     """
     Convierte un PDF en imágenes y extrae todo el texto vía OCR
     """
-    imagenes = convert_from_path(pdf_path)
+    imagenes = convert_from_path(pdf_path, poppler_path=POPPLER_PATH)
 
     texto_total = ""
     for img in imagenes:
