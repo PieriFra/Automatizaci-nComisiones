@@ -314,3 +314,103 @@ def generar_reporte_mensual_pdf(ruta_salida, df_resumen, acumulado_vendedores):
     elementos.append(tabla_vendedores)
 
     doc.build(elementos)
+
+
+# Nueva función para Reporte de Comisiones
+def generar_reporte_comisiones_pdf(ruta_salida, df_resumen):
+    doc = SimpleDocTemplate(ruta_salida, pagesize=A4)
+    elementos = []
+    estilos = getSampleStyleSheet()
+
+    # -----------------------------
+    # TÍTULO
+    # -----------------------------
+    elementos.append(Paragraph("<b>REPORTE DE COMISIONES</b>", estilos["Title"]))
+    elementos.append(Spacer(1, 0.3 * inch))
+
+    fecha_gen = datetime.now().strftime("%d/%m/%Y")
+    elementos.append(Paragraph(f"Fecha de generación: {fecha_gen}", estilos["Normal"]))
+    elementos.append(Spacer(1, 0.3 * inch))
+
+    # -----------------------------
+    # TABLA PLANILLAS
+    # -----------------------------
+    data_planillas = [["Planilla", "Fecha", "Total Cobrado", "Comisiones"]]
+
+    total_cobrado_mes = df_resumen["Total"].sum()
+    total_comisiones_mes = df_resumen["Comisiones Planilla"].sum()
+
+    for _, row in df_resumen.iterrows():
+        data_planillas.append([
+            row["Planilla"],
+            row["Fecha"],
+            f"${row['Total']:,.2f}",
+            f"${row['Comisiones Planilla']:,.2f}",
+        ])
+
+    tabla_planillas = Table(data_planillas, repeatRows=1)
+    tabla_planillas.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+        ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
+        ("ALIGN", (2,1), (-1,-1), "RIGHT"),
+    ]))
+
+    elementos.append(tabla_planillas)
+    elementos.append(Spacer(1, 0.5 * inch))
+
+    # -----------------------------
+    # TOTALES GENERALES
+    # -----------------------------
+    elementos.append(Paragraph("<b>TOTALES MENSUALES</b>", estilos["Heading2"]))
+    elementos.append(Spacer(1, 0.2 * inch))
+
+    elementos.append(Paragraph(
+        f"Total cobrado del mes: ${total_cobrado_mes:,.2f}",
+        estilos["Normal"]
+    ))
+
+    elementos.append(Paragraph(
+        f"Total comisiones del mes: ${total_comisiones_mes:,.2f}",
+        estilos["Normal"]
+    ))
+
+    doc.build(elementos)
+
+
+# Nueva función para Distribución de Comisiones
+def generar_distribucion_comisiones_pdf(ruta_salida, acumulado_vendedores):
+    doc = SimpleDocTemplate(ruta_salida, pagesize=A4)
+    elementos = []
+    estilos = getSampleStyleSheet()
+
+    # -----------------------------
+    # TÍTULO
+    # -----------------------------
+    elementos.append(Paragraph("<b>DISTRIBUCIÓN DE COMISIONES</b>", estilos["Title"]))
+    elementos.append(Spacer(1, 0.3 * inch))
+
+    fecha_gen = datetime.now().strftime("%d/%m/%Y")
+    elementos.append(Paragraph(f"Fecha de generación: {fecha_gen}", estilos["Normal"]))
+    elementos.append(Spacer(1, 0.3 * inch))
+
+    # -----------------------------
+    # DISTRIBUCIÓN VENDEDORES
+    # -----------------------------
+    data_vendedores = [["Vendedor", "Comisión Total"]]
+
+    for vendedor, total in acumulado_vendedores.items():
+        data_vendedores.append([
+            vendedor,
+            f"${total:,.2f}"
+        ])
+
+    tabla_vendedores = Table(data_vendedores, repeatRows=1)
+    tabla_vendedores.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+        ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
+        ("ALIGN", (1,1), (-1,-1), "RIGHT"),
+    ]))
+
+    elementos.append(tabla_vendedores)
+
+    doc.build(elementos)
