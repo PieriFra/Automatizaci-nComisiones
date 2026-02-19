@@ -8,6 +8,7 @@ from reportlab.lib.pagesizes import A4
 from datetime import datetime
 import os
 import pandas as pd
+from clientes_vendedor import MAPA_CLIENTES_VENDEDORES
 from collections import defaultdict
 from ComisionMensual import extraer_texto_pdf, normalizar_texto, extraer_planilla_y_fecha, extraer_total_y_comisiones  
 
@@ -85,6 +86,34 @@ def extraer_importes(texto):
 # 3️⃣ Emparejar usando posiciones de SUBTOTAL (TU IDEA)
 def totales_por_cliente(texto_norm, total_general):
     clientes_raw = extraer_clientes_raw(texto_norm)
+    
+    # 🔧 Fusionar nombres de clientes divididos en múltiples líneas (hasta 4)
+    i = 0
+    while i < len(clientes_raw):
+        cliente = clientes_raw[i]
+        if cliente in MAPA_CLIENTES_VENDEDORES:
+            i += 1
+            continue
+        # Intentar fusionar con siguientes líneas (máximo 4)
+        fusion = cliente
+        j = 1
+        fusionado = False
+        while i + j < len(clientes_raw) and j <= 4:
+            fusion += " " + clientes_raw[i + j]
+            if fusion in MAPA_CLIENTES_VENDEDORES:
+                # Fusionar: reemplazar en i, eliminar las siguientes j líneas
+                clientes_raw[i] = fusion
+                for k in range(j):
+                    del clientes_raw[i + 1]
+                fusionado = True
+                break
+            j += 1
+        if not fusionado:
+            # No se pudo fusionar, dejar como está
+            pass
+        i += 1
+    
+    importes = extraer_importes(texto_norm)
     importes = extraer_importes(texto_norm)
 
     # 🔎 buscar dónde aparece el total general (con tolerancia)
@@ -134,6 +163,10 @@ def calcular_comisiones_vendedores(totales_clientes, cliente_vendedor):
         elif vendedor == "GIUSTA":
             comisiones["GIUSTA"] += total * 0.06
             comisiones["FRAIRE"] += total * 0.04
+
+        elif vendedor == "ALARCÓN":
+            comisiones["ALARCÓN"] += total * 0.05
+            comisiones["FRAIRE"] += total * 0.05
 
         else:
             raise ValueError(f"Vendedor desconocido: {vendedor}")
