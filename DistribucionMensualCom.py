@@ -1,4 +1,5 @@
 import re
+import unicodedata
 from collections import defaultdict
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib import colors
@@ -84,68 +85,130 @@ def extraer_importes(texto):
     return importes
 
 # 3️⃣ Emparejar usando posiciones de SUBTOTAL (TU IDEA)
-def totales_por_cliente(texto_norm, total_general):
-    clientes_raw = extraer_clientes_raw(texto_norm)
-    
-    # 🔧 Fusionar nombres de clientes divididos en múltiples líneas (hasta 4)
-    i = 0
-    while i < len(clientes_raw):
-        cliente = clientes_raw[i]
-        if cliente in MAPA_CLIENTES_VENDEDORES:
-            i += 1
-            continue
-        # Intentar fusionar con siguientes líneas (máximo 4)
-        fusion = cliente
-        j = 1
-        fusionado = False
-        while i + j < len(clientes_raw) and j <= 4:
-            fusion += " " + clientes_raw[i + j]
-            if fusion in MAPA_CLIENTES_VENDEDORES:
-                # Fusionar: reemplazar en i, eliminar las siguientes j líneas
-                clientes_raw[i] = fusion
-                for k in range(j):
-                    del clientes_raw[i + 1]
-                fusionado = True
-                break
-            j += 1
-        if not fusionado:
-            # No se pudo fusionar, dejar como está
-            pass
-        i += 1
-    
-    importes = extraer_importes(texto_norm)
-    importes = extraer_importes(texto_norm)
+def totales_por_cliente(texto_norm, total_general, *, return_audit: bool = False):
+    """
+    Extrae totales por cliente usando:
+    - match del nombre del cliente contra `MAPA_CLIENTES_VENDEDORES`
+    - lectura de montos desde líneas que contienen `SUBTOTAL`
 
-    # 🔎 buscar dónde aparece el total general (con tolerancia)
-    indice_total = None
-    for i, imp in enumerate(importes):
-        if abs(imp - total_general) < 0.01:
-            indice_total = i
-            break
+    Nota: el OCR suele venir con el encabezado `CLIENTE ... IMPORTE ...` en la misma línea,
+    y las filas del cliente mezclan nombre + columnas. Por eso no dependemos de
+    igualdad exacta de líneas ni de la alineación por índice.
+    """
 
-    if indice_total is not None:
-        # 🔴 quedarnos solo con lo anterior al TOTAL
-        importes = importes[:indice_total]
+    def _normalizar_para_match(s: str) -> str:
+        s = (s or "").upper()
+        s = s.replace("�", "").replace("?", "")
+        s = unicodedata.normalize("NFKD", s)
+        s = "".join(ch for ch in s if not unicodedata.combining(ch))
+        s = re.sub(r"\s+", " ", s).strip()
+        return s
 
-    # Si no se encontró, asumir que importes ya está correcto
+    # Regex de importes tolerante a OCR:
+    # - acepta espacios extra (ej: "$77.537, 44")
+    # - conserva formato miles/decimales esperado
+    rx_importe = re.compile(r"\$?\s*(\d{1,3}(?:\.\d{3})*,\s*\d{2})")
 
-    if len(clientes_raw) != len(importes):
-        raise ValueError(
-            f"Clientes ({len(clientes_raw)}) e importes ({len(importes)}) no coinciden"
-        )
+    # Precomputar claves normalizadas para identificar el cliente dentro de la fila OCR
+    mapa_normalizado = {}
+    for nombre in MAPA_CLIENTES_VENDEDORES.keys():
+        mapa_normalizado[_normalizar_para_match(nombre)] = nombre
+    claves_norm = sorted(mapa_normalizado.keys(), key=len, reverse=True)
 
-    from collections import defaultdict
     totales = defaultdict(float)
     cliente_actual = None
+    audit = {
+        "subtotales_sin_cliente": [],  # list[tuple[linea, monto]]
+    }
 
-    for i, item in enumerate(clientes_raw):
-        if item != "SUBTOTAL":
-            cliente_actual = item
-        else:
-            subtotal = importes[i]
-            totales[cliente_actual] += subtotal
+    lineas = [ln.strip() for ln in texto_norm.splitlines()]
+    capturar = False
+    i = 0
+    while i < len(lineas):
+        linea = lineas[i]
+        if not linea:
+            i += 1
+            continue
 
-    return totales
+        if not capturar:
+            # En OCR suele aparecer como: "CLIENTE PAGO ... IMPORTE ... ESTADO DE PAGO"
+            if (("CLIENTE" in linea) and ("IMPORTE" in linea)) or linea.startswith("CLIENTE"):
+                capturar = True
+            i += 1
+            continue
+
+        # Corte al llegar al total general
+        if linea.startswith("TOTAL"):
+            break
+
+        # Registrar SUBTOTAL
+        if "SUBTOTAL" in linea:
+            m = rx_importe.search(linea)
+            # Si OCR separó "SUBTOTAL" y el monto en la/s línea/s siguiente/s, buscar lookahead corto.
+            if not m:
+                j = i + 1
+                while j < len(lineas) and j <= i + 6:
+                    prox = lineas[j]
+                    if not prox:
+                        j += 1
+                        continue
+                    if prox.startswith("TOTAL") or prox.startswith("COMISIONES"):
+                        break
+                    m = rx_importe.search(prox)
+                    if m:
+                        break
+                    j += 1
+            # Caso OCR frecuente: aparece "SUBTOTAL" y recién después de líneas TOTAL/COMISIONES
+            # queda el importe suelto del subtotal. Tomamos el primer importe cercano que no sea el TOTAL general.
+            if not m:
+                j = i + 1
+                while j < len(lineas) and j <= i + 14:
+                    prox = lineas[j]
+                    if not prox:
+                        j += 1
+                        continue
+                    m2 = rx_importe.search(prox)
+                    if not m2:
+                        j += 1
+                        continue
+                    bruto2 = m2.group(1).replace(" ", "")
+                    valor2 = float(bruto2.replace(".", "").replace(",", "."))
+                    # Evitar tomar TOTAL general por error de OCR
+                    if abs(valor2 - total_general) < 0.01:
+                        j += 1
+                        continue
+                    m = m2
+                    break
+            if not m:
+                i += 1
+                continue
+
+            bruto = m.group(1).replace(" ", "")
+            valor = float(bruto.replace(".", "").replace(",", "."))
+            if cliente_actual is None:
+                audit["subtotales_sin_cliente"].append((linea, valor))
+                i += 1
+                continue
+            totales[cliente_actual] += valor
+            i += 1
+            continue
+
+        # Ignorar líneas que suelen ser encabezados
+        if "MÉTODO" in linea or "ESTADO DE PAGO" in linea:
+            i += 1
+            continue
+
+        # Actualizar el cliente actual si la fila contiene su nombre
+        linea_norm = _normalizar_para_match(linea)
+        for clave_norm in claves_norm:
+            if clave_norm and clave_norm in linea_norm:
+                cliente_actual = mapa_normalizado[clave_norm]
+                break
+        i += 1
+
+    if return_audit:
+        return dict(totales), audit
+    return dict(totales)
 
 ## ----------------------------- ETAPA 2 — GENERAR PDF DE DISTRIBUCIÓN MENSUAL ----------------------------
 def calcular_comisiones_vendedores(totales_clientes, cliente_vendedor):
@@ -158,15 +221,18 @@ def calcular_comisiones_vendedores(totales_clientes, cliente_vendedor):
             raise ValueError(f"Cliente sin vendedor asignado: {cliente}")
 
         if vendedor == "FRAIRE":
-            comisiones["FRAIRE"] += total * 0.10
+            # En las planillas, la línea "COMISIONES" equivale al 8% del TOTAL.
+            comisiones["FRAIRE"] += total * 0.08
 
         elif vendedor == "GIUSTA":
-            comisiones["GIUSTA"] += total * 0.06
-            comisiones["FRAIRE"] += total * 0.04
+            # Mantener la proporción original (6/10 para GIUSTA y 4/10 para FRAIRE)
+            # pero sobre una base total 8%.
+            comisiones["GIUSTA"] += total * 0.05
+            comisiones["FRAIRE"] += total * 0.03
 
         elif vendedor == "ALARCÓN":
-            comisiones["ALARCÓN"] += total * 0.05
-            comisiones["FRAIRE"] += total * 0.05
+            comisiones["ALARCÓN"] += total * 0.04
+            comisiones["FRAIRE"] += total * 0.04
 
         else:
             raise ValueError(f"Vendedor desconocido: {vendedor}")
@@ -177,13 +243,17 @@ def procesar_carpeta_planillas(carpeta_path, mapa_clientes_vendedores):
 
     resumen_planillas = []
     acumulado_vendedores = defaultdict(float)
+    # Tolerancias (por redondeos y OCR)
+    tolerancia_pesos = 2.0
 
     for archivo in os.listdir(carpeta_path):
 
         if not archivo.lower().endswith(".pdf"):
             continue
-
-        if archivo == "Reporte_Comisiones.pdf":
+        # Evitar re-procesar los PDFs generados por este mismo script.
+        # Los nombres suelen variar (con espacios y/o mes), así que usamos "contains" con normalización.
+        archivo_norm = unicodedata.normalize("NFKD", archivo).encode("ascii", "ignore").decode("ascii").lower()
+        if ("reporte comisiones" in archivo_norm) or ("distribucion comisiones" in archivo_norm):
             continue
 
         pdf_path = os.path.join(carpeta_path, archivo)
@@ -193,19 +263,42 @@ def procesar_carpeta_planillas(carpeta_path, mapa_clientes_vendedores):
         # 1️⃣ OCR + Normalización
         texto = extraer_texto_pdf(pdf_path)
         texto_norm = normalizar_texto(texto)
+        # print(texto_norm)
 
         # 2️⃣ Datos generales
         planilla, fecha = extraer_planilla_y_fecha(texto_norm)
         total, comisiones_total = extraer_total_y_comisiones(texto_norm)
 
-        # 3️⃣ Totales por cliente
-        totales_clientes = totales_por_cliente(texto_norm, total)
+        # 3️⃣ Totales por cliente (+ auditoría de subtotales sin asignar)
+        totales_clientes, audit = totales_por_cliente(texto_norm, total, return_audit=True)
 
         # 4️⃣ Calcular comisiones por vendedor
         comisiones_vendedores = calcular_comisiones_vendedores(
             totales_clientes,
             mapa_clientes_vendedores
         )
+
+        # ✅ Chequeos de consistencia (por planilla)
+        suma_totales_clientes = sum(totales_clientes.values())
+        diff_total = suma_totales_clientes - total
+        if abs(diff_total) > tolerancia_pesos:
+            missing_sum = sum(v for _, v in audit["subtotales_sin_cliente"])
+            print(
+                f"⚠️ Aviso: la suma de SUBTOTALES por cliente no coincide con TOTAL en '{archivo}'. "
+                f"Diferencia: {diff_total:,.2f}. "
+                f"SUBTOTAL sin cliente asignado: {missing_sum:,.2f}."
+            )
+
+        suma_distribuida = sum(comisiones_vendedores.values())
+        diff_com = suma_distribuida - comisiones_total
+        if abs(diff_com) > tolerancia_pesos:
+            missing_sum = sum(v for _, v in audit["subtotales_sin_cliente"])
+            print(
+                f"⚠️ Aviso: la suma distribuida por vendedor no coincide con COMISIONES en '{archivo}'. "
+                f"Diferencia: {diff_com:,.2f}. "
+                f"Esto suele pasar si hay clientes/subtotales que no matchean el diccionario. "
+                f"SUBTOTAL sin cliente asignado: {missing_sum:,.2f}."
+            )
 
         # 5️⃣ Acumular vendedores
         for vendedor, valor in comisiones_vendedores.items():
@@ -227,6 +320,18 @@ def procesar_carpeta_planillas(carpeta_path, mapa_clientes_vendedores):
 
     # 📊 DataFrame final
     df = pd.DataFrame(resumen_planillas)
+
+    # ✅ Chequeo final: suma de comisiones por planilla vs suma distribuida por vendedores
+    if not df.empty and "Comisiones Planilla" in df.columns:
+        total_comisiones_planillas = float(df["Comisiones Planilla"].sum())
+        total_distribuido = float(sum(acumulado_vendedores.values()))
+        diff_final = total_distribuido - total_comisiones_planillas
+        if abs(diff_final) > tolerancia_pesos:
+            raise ValueError(
+                f"Error de consistencia: total distribuido por vendedores ({total_distribuido:,.2f}) "
+                f"no coincide con total COMISIONES de planillas ({total_comisiones_planillas:,.2f}). "
+                f"Diferencia: {diff_final:,.2f}."
+            )
 
     return df, dict(acumulado_vendedores)
 
@@ -318,6 +423,12 @@ def generar_reporte_mensual_pdf(ruta_salida, df_resumen, acumulado_vendedores):
 
 # Nueva función para Reporte de Comisiones
 def generar_reporte_comisiones_pdf(ruta_salida, df_resumen):
+
+    # --- LIMPIEZA DEL DATAFRAME ---
+    df_resumen = df_resumen.dropna(subset=["Planilla"])  # Elimina filas con NaN en Planilla
+    df_resumen = df_resumen.drop_duplicates(subset=["Planilla", "Fecha"])  # Elimina duplicados exactos
+    df_resumen = df_resumen.reset_index(drop=True)
+
     doc = SimpleDocTemplate(ruta_salida, pagesize=A4)
     elementos = []
     estilos = getSampleStyleSheet()

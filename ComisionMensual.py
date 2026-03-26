@@ -51,13 +51,21 @@ def extraer_total_y_comisiones(texto):
     # El TOTAL es el número más grande
     total = max(numeros)
 
-    # La comisión es el número que aparece inmediatamente después del TOTAL
-    idx = numeros.index(total)
-
-    if idx + 1 < len(numeros):
-        comisiones = numeros[idx + 1]
+    # Verificar si hay "Rosental" en el texto (insensible a mayúsculas)
+    if "ROSENTAL" in texto.upper():
+        # En este caso, las comisiones totales están 3 posiciones después del total
+        idx = numeros.index(total)
+        if idx + 3 < len(numeros):
+            comisiones = numeros[idx + 3]
+        else:
+            comisiones = 0.0
     else:
-        comisiones = 0.0
+        # Lógica original: La comisión es el número que aparece inmediatamente después del TOTAL
+        idx = numeros.index(total)
+        if idx + 1 < len(numeros):
+            comisiones = numeros[idx + 1]
+        else:
+            comisiones = 0.0
 
     return total, comisiones
 
