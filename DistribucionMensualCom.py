@@ -420,7 +420,6 @@ def generar_reporte_mensual_pdf(ruta_salida, df_resumen, acumulado_vendedores):
 
     doc.build(elementos)
 
-
 # Nueva función para Reporte de Comisiones
 def generar_reporte_comisiones_pdf(ruta_salida, df_resumen):
 
@@ -429,6 +428,15 @@ def generar_reporte_comisiones_pdf(ruta_salida, df_resumen):
     df_resumen = df_resumen.drop_duplicates(subset=["Planilla", "Fecha"])  # Elimina duplicados exactos
     df_resumen = df_resumen.reset_index(drop=True)
 
+    # Después de la limpieza del DataFrame, antes del título
+    fecha_ref = pd.to_datetime(df_resumen["Fecha"], dayfirst=True).iloc[0]
+    meses = {
+        1: "ENERO", 2: "FEBRERO", 3: "MARZO", 4: "ABRIL",
+        5: "MAYO", 6: "JUNIO", 7: "JULIO", 8: "AGOSTO",
+        9: "SEPTIEMBRE", 10: "OCTUBRE", 11: "NOVIEMBRE", 12: "DICIEMBRE"
+    }
+    mes_anio = f"{meses[fecha_ref.month]} {fecha_ref.year}"
+
     doc = SimpleDocTemplate(ruta_salida, pagesize=A4)
     elementos = []
     estilos = getSampleStyleSheet()
@@ -436,7 +444,7 @@ def generar_reporte_comisiones_pdf(ruta_salida, df_resumen):
     # -----------------------------
     # TÍTULO
     # -----------------------------
-    elementos.append(Paragraph("<b>REPORTE DE COMISIONES</b>", estilos["Title"]))
+    elementos.append(Paragraph(f"<b>REPORTE DE COMISIONES {mes_anio}</b>", estilos["Title"]))
     elementos.append(Spacer(1, 0.3 * inch))
 
     fecha_gen = datetime.now().strftime("%d/%m/%Y")
@@ -487,9 +495,18 @@ def generar_reporte_comisiones_pdf(ruta_salida, df_resumen):
 
     doc.build(elementos)
 
-
 # Nueva función para Distribución de Comisiones
-def generar_distribucion_comisiones_pdf(ruta_salida, acumulado_vendedores):
+def generar_distribucion_comisiones_pdf(ruta_salida, acumulado_vendedores, df_resumen):
+
+    # Después de la limpieza del DataFrame, antes del título
+    fecha_ref = pd.to_datetime(df_resumen["Fecha"], dayfirst=True).iloc[0]
+    meses = {
+        1: "ENERO", 2: "FEBRERO", 3: "MARZO", 4: "ABRIL",
+        5: "MAYO", 6: "JUNIO", 7: "JULIO", 8: "AGOSTO",
+        9: "SEPTIEMBRE", 10: "OCTUBRE", 11: "NOVIEMBRE", 12: "DICIEMBRE"
+    }
+    mes_anio = f"{meses[fecha_ref.month]} {fecha_ref.year}"
+
     doc = SimpleDocTemplate(ruta_salida, pagesize=A4)
     elementos = []
     estilos = getSampleStyleSheet()
@@ -497,7 +514,7 @@ def generar_distribucion_comisiones_pdf(ruta_salida, acumulado_vendedores):
     # -----------------------------
     # TÍTULO
     # -----------------------------
-    elementos.append(Paragraph("<b>DISTRIBUCIÓN DE COMISIONES</b>", estilos["Title"]))
+    elementos.append(Paragraph(f"<b>DISTRIBUCIÓN DE COMISIONES {mes_anio} </b>", estilos["Title"]))
     elementos.append(Spacer(1, 0.3 * inch))
 
     fecha_gen = datetime.now().strftime("%d/%m/%Y")

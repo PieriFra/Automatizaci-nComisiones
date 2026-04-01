@@ -1,5 +1,6 @@
 import os
 import sys
+import pandas as pd
 from datetime import datetime
 from DistribucionMensualCom import procesar_carpeta_planillas, generar_reporte_comisiones_pdf, generar_distribucion_comisiones_pdf
 from clientes_vendedor import MAPA_CLIENTES_VENDEDORES
@@ -36,16 +37,18 @@ def ejecutar_proceso(carpeta_path: str):
     if df_resumen is None or df_resumen.empty:
         raise ValueError("No se encontraron planillas válidas.")
 
-    # Obtener el mes actual
-    mes_actual = MESES[datetime.now().month]
+    # Extraer el mes/año desde las fechas del DataFrame
+    fecha_ref = pd.to_datetime(df_resumen["Fecha"], dayfirst=True).iloc[0]
+    mes_reporte = MESES[fecha_ref.month]
+    anio_reporte = fecha_ref.year
 
     # Generar Reporte de Comisiones
-    ruta_reporte_comisiones = os.path.join(carpeta_path, f"Reporte Comisiones {mes_actual}.pdf")
+    ruta_reporte_comisiones = os.path.join(carpeta_path, f"Reporte Comisiones {mes_reporte} {anio_reporte}.pdf")
     generar_reporte_comisiones_pdf(ruta_reporte_comisiones, df_resumen)
 
     # Generar Distribución de Comisiones
-    ruta_distribucion_comisiones = os.path.join(carpeta_path, f"Distribución Comisiones {mes_actual}.pdf")
-    generar_distribucion_comisiones_pdf(ruta_distribucion_comisiones, acumulado_vendedores)
+    ruta_distribucion_comisiones = os.path.join(carpeta_path, f"Distribución Comisiones {mes_reporte} {anio_reporte}.pdf")
+    generar_distribucion_comisiones_pdf(ruta_distribucion_comisiones, acumulado_vendedores, df_resumen)
 
     print("\n✅ Proceso finalizado correctamente.")
     print(f"📄 Reporte de Comisiones generado en:\n{ruta_reporte_comisiones}\n")
