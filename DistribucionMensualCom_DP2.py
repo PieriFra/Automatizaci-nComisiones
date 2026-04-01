@@ -11,7 +11,7 @@ import os
 import pandas as pd
 from clientes_vendedor import MAPA_CLIENTES_VENDEDORES
 from collections import defaultdict
-from ComisionMensual import extraer_texto_pdf, normalizar_texto, extraer_planilla_y_fecha, extraer_total_y_comisiones  
+from ComisionMensual_DP2 import extraer_texto_pdf, normalizar_texto, extraer_planilla_y_fecha, extraer_total_y_comisiones  
 
 
 # ----------------------------- ETAPA 1 — PROCESAR TEXTO PARA OBTENER DISTRIBUCIÓN MENSUAL ----------------------------

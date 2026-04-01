@@ -2,7 +2,7 @@ import os
 import sys
 import pandas as pd
 from datetime import datetime
-from DistribucionMensualCom import procesar_carpeta_planillas, generar_reporte_comisiones_pdf, generar_distribucion_comisiones_pdf
+from DistribucionMensualCom_DP2 import procesar_carpeta_planillas, generar_reporte_comisiones_pdf, generar_distribucion_comisiones_pdf
 from clientes_vendedor import MAPA_CLIENTES_VENDEDORES
 
 # Diccionario para nombres de meses en español
