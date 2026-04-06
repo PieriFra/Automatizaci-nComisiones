@@ -2,13 +2,23 @@ import os
 import sys
 import pandas as pd
 from datetime import datetime
-from clientes_vendedor import MAPA_CLIENTES_DP, MAPA_CLIENTES_FILLS
-from DistribucionMensualCom import procesar_carpeta_planillas, generar_reporte_comisiones_pdf, generar_distribucion_comisiones_pdf
+from DistribucionMensualCom_DP2 import procesar_carpeta_planillas, generar_reporte_comisiones_pdf, generar_distribucion_comisiones_pdf
+from clientes_vendedor import MAPA_CLIENTES_VENDEDORES
 
+# Diccionario para nombres de meses en español
 MESES = {
-    1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
-    5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
-    9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
+    1: "Enero",
+    2: "Febrero",
+    3: "Marzo",
+    4: "Abril",
+    5: "Mayo",
+    6: "Junio",
+    7: "Julio",
+    8: "Agosto",
+    9: "Septiembre",
+    10: "Octubre",
+    11: "Noviembre",
+    12: "Diciembre"
 }
 
 def ejecutar_proceso(carpeta_path: str):
@@ -18,21 +28,25 @@ def ejecutar_proceso(carpeta_path: str):
 
     print("\n🔄 Procesando planillas...\n")
 
+    # Usar la función de DistribucionMensualCom que necesita el mapa de clientes->vendedores
     df_resumen, acumulado_vendedores = procesar_carpeta_planillas(
         carpeta_path,
-        MAPA_CLIENTES_DP, MAPA_CLIENTES_FILLS
+        MAPA_CLIENTES_VENDEDORES
     )
 
     if df_resumen is None or df_resumen.empty:
         raise ValueError("No se encontraron planillas válidas.")
 
+    # Extraer el mes/año desde las fechas del DataFrame
     fecha_ref = pd.to_datetime(df_resumen["Fecha"], dayfirst=True).iloc[0]
     mes_reporte = MESES[fecha_ref.month]
     anio_reporte = fecha_ref.year
 
+    # Generar Reporte de Comisiones
     ruta_reporte_comisiones = os.path.join(carpeta_path, f"Reporte Comisiones {mes_reporte} {anio_reporte}.pdf")
     generar_reporte_comisiones_pdf(ruta_reporte_comisiones, df_resumen)
 
+    # Generar Distribución de Comisiones
     ruta_distribucion_comisiones = os.path.join(carpeta_path, f"Distribución Comisiones {mes_reporte} {anio_reporte}.pdf")
     generar_distribucion_comisiones_pdf(ruta_distribucion_comisiones, acumulado_vendedores, df_resumen)
 
