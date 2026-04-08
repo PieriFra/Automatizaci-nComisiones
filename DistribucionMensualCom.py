@@ -241,27 +241,54 @@ def _mes_anio(df: pd.DataFrame) -> str:
     return f"{_MESES[fecha_ref.month]} {fecha_ref.year}"
 
 
-def _tabla_planillas(df_empresa: pd.DataFrame) -> Table:
+def _tabla_planillas(df_empresa: pd.DataFrame, empresa: str) -> Table:
     data = [["Planilla", "Tipo", "Fecha", "Total Cobrado", "Comisiones"]]
-    for _, row in df_empresa.iterrows():
+    # Índices de filas de subtotal y total para aplicar estilo luego
+    filas_subtotal = []
+    fila_total     = 0
+
+    for tipo in sorted(df_empresa["Tipo"].unique()):
+        df_tipo = df_empresa[df_empresa["Tipo"] == tipo]
+        for _, row in df_tipo.iterrows():
+            data.append([
+                row["Planilla"],
+                f"Tipo {int(row['Tipo'])}",
+                row["Fecha"],
+                f"${row['Total']:,.2f}",
+                f"${row['Comisiones Planilla']:,.2f}",
+            ])
+        # Fila subtotal por tipo
+        filas_subtotal.append(len(data))
         data.append([
-            row["Planilla"],
-            f"Tipo {int(row['Tipo'])}",
-            row["Fecha"],
-            f"${row['Total']:,.2f}",
-            f"${row['Comisiones Planilla']:,.2f}",
+            f"SUBTOTAL TIPO {int(tipo)}", "", "",
+            f"${df_tipo['Total'].sum():,.2f}",
+            f"${df_tipo['Comisiones Planilla'].sum():,.2f}",
         ])
-    # Fila de totales
+
+    # Fila total general de la empresa
+    fila_total = len(data)
     data.append([
-        "TOTAL", "", "",
+        f"TOTAL {empresa}", "", "",
         f"${df_empresa['Total'].sum():,.2f}",
         f"${df_empresa['Comisiones Planilla'].sum():,.2f}",
     ])
+
     tabla = Table(data, repeatRows=1)
-    estilo = _ESTILO_TABLA + [
-        ("FONTNAME",      (0, -1), (-1, -1), "Helvetica-Bold"),
-        ("BACKGROUND",    (0, -1), (-1, -1), colors.lightgrey),
+    estilo = list(_ESTILO_TABLA)
+
+    # Estilo para filas de subtotal (gris claro + negrita)
+    for idx in filas_subtotal:
+        estilo += [
+            ("FONTNAME",   (0, idx), (-1, idx), "Helvetica-Bold"),
+            ("BACKGROUND", (0, idx), (-1, idx), colors.Color(0.88, 0.88, 0.88)),
+        ]
+
+    # Estilo para fila de total general (gris más oscuro + negrita)
+    estilo += [
+        ("FONTNAME",   (0, fila_total), (-1, fila_total), "Helvetica-Bold"),
+        ("BACKGROUND", (0, fila_total), (-1, fila_total), colors.Color(0.70, 0.70, 0.70)),
     ]
+
     tabla.setStyle(TableStyle(estilo))
     return tabla
 
@@ -299,7 +326,7 @@ def generar_reporte_comisiones_pdf(ruta_salida: str, df_resumen: pd.DataFrame):
         df_emp = df[df["Empresa"] == empresa]
         elems.append(Paragraph(f"<b>Empresa: {empresa}</b>", estilos["Heading2"]))
         elems.append(Spacer(1, 0.15 * inch))
-        elems.append(_tabla_planillas(df_emp))
+        elems.append(_tabla_planillas(df_emp, empresa))
         elems.append(Spacer(1, 0.4 * inch))
 
     doc.build(elems)
