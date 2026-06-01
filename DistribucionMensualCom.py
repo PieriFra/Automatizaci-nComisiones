@@ -12,26 +12,15 @@ import os
 import re
 from collections import defaultdict
 from datetime import datetime
-
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.lib.pagesizes import A4
-
-from clientes_vendedor import (
-    MAPA_CLIENTES_DP, MAPA_CLIENTES_FILLS,
-    REGLAS_COMISION, REGLAS_ESPECIALES,
-)
+from clientes_vendedor import REGLAS_COMISION, REGLAS_ESPECIALES
 from pdf_reader import extraer_texto_pdf, detectar_empresa, detectar_tipo_informe
 from planilla_parser import parsear_planilla, _normalizar
-
-MAPAS_POR_EMPRESA = {
-    "DP":    MAPA_CLIENTES_DP,
-    "FILLS": MAPA_CLIENTES_FILLS,
-}
-
 
 # ---------------------------------------------------------------------------
 # Helpers de matching
@@ -116,9 +105,11 @@ def calcular_comisiones_vendedores(
 
 def procesar_carpeta_planillas(
     carpeta_path: str,
-    mapa_clientes_vendedores: dict,  # mantenido por compatibilidad con main.py
+    mapa_dp: dict[str, str],
+    mapa_fills: dict[str, str],
+    *,
     verbose: bool = True,
-) -> tuple:
+) -> tuple[pd.DataFrame, dict]:
     """
     Procesa todos los PDFs de la carpeta.
 
@@ -127,6 +118,7 @@ def procesar_carpeta_planillas(
         acumulado_vendedores : { empresa: { vendedor: total } }
     """
     TOLERANCIA = 2.0
+    mapas_por_empresa = {"DP": mapa_dp, "FILLS": mapa_fills}
 
     resumen_planillas = []
     acumulado_por_empresa = defaultdict(lambda: defaultdict(float))
@@ -156,7 +148,7 @@ def procesar_carpeta_planillas(
             comis_total = datos["comisiones"]
             subtotales  = datos["subtotales"]
 
-            mapa_empresa = MAPAS_POR_EMPRESA[empresa]
+            mapa_empresa = mapas_por_empresa[empresa]
             comisiones_vendedores = calcular_comisiones_vendedores(
                 subtotales, mapa_empresa, empresa, tipo_informe
             )
@@ -242,20 +234,20 @@ def _mes_anio(df: pd.DataFrame) -> str:
 
 
 def _tabla_planillas(df_empresa: pd.DataFrame, empresa: str) -> Table:
-    data = [["Planilla", "Tipo", "Fecha", "Total Cobrado", "Comisiones"]]
+    data: list[list[str]] = [["Planilla", "Tipo", "Fecha", "Total Cobrado", "Comisiones"]]
     # Índices de filas de subtotal y total para aplicar estilo luego
     filas_subtotal = []
     fila_total     = 0
 
     for tipo in sorted(df_empresa["Tipo"].unique()):
-        df_tipo = df_empresa[df_empresa["Tipo"] == tipo]
+        df_tipo = df_empresa.loc[df_empresa["Tipo"] == tipo]
         for _, row in df_tipo.iterrows():
             data.append([
-                row["Planilla"],
+                str(row["Planilla"]),
                 f"Tipo {int(row['Tipo'])}",
-                row["Fecha"],
-                f"${row['Total']:,.2f}",
-                f"${row['Comisiones Planilla']:,.2f}",
+                str(row["Fecha"]),
+                f"${float(row['Total']):,.2f}",
+                f"${float(row['Comisiones Planilla']):,.2f}",
             ])
         # Fila subtotal por tipo
         filas_subtotal.append(len(data))
@@ -323,7 +315,7 @@ def generar_reporte_comisiones_pdf(ruta_salida: str, df_resumen: pd.DataFrame):
     elems.append(Spacer(1, 0.3 * inch))
 
     for empresa in sorted(df["Empresa"].unique()):
-        df_emp = df[df["Empresa"] == empresa]
+        df_emp: pd.DataFrame = df.loc[df["Empresa"] == empresa]
         elems.append(Paragraph(f"<b>Empresa: {empresa}</b>", estilos["Heading2"]))
         elems.append(Spacer(1, 0.15 * inch))
         elems.append(_tabla_planillas(df_emp, empresa))

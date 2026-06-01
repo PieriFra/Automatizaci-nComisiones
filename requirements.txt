@@ -1,0 +1,12 @@
+# Dependencias directas del proyecto (flujo principal + versión1 + OCR fallback)
+# Instalación: python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+#
+# OCR (pdf_reader.py, versión1/): además instalar en el sistema:
+#   macOS: brew install tesseract poppler
+#   Windows: Tesseract-OCR y Poppler (ver rutas en pdf_reader.py)
+
+pandas>=2.0
+reportlab>=4.0
+pdfplumber>=0.10.0
+pytesseract>=0.3.10
+pdf2image>=1.16.0

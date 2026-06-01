@@ -1,3 +1,6 @@
 *.pdf
 *.txt
+!requirements.txt
 *.pyc
+.venv/
+venv/
