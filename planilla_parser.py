@@ -92,7 +92,7 @@ def _parsear_tipo2(texto: str) -> dict:
             continue
         linea_up = linea_s.upper()
 
-        if re.match(r'^TOTAL\b', linea_up) and not linea_up.startswith("SUBTOTAL"):
+        if re.match(r'^TOTAL\s*\$', linea_up):
             m = _RX_IMPORTE.search(linea_s)
             if m:
                 total = _parse_monto(m.group(1))
