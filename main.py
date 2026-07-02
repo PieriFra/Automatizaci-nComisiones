@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import sys
 import pandas as pd
@@ -11,10 +13,22 @@ MESES = {
     9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
 }
 
-def ejecutar_proceso(carpeta_path: str):
+# Carpeta donde se guardan por defecto los PDFs generados (Reporte y
+# Distribución de Comisiones), separada de la carpeta con las planillas.
+CARPETA_SALIDA_DEFAULT = (
+    "/Users/pierinafrairealassia/Library/Mobile Documents/com~apple~CloudDocs/"
+    "Trabajo/Di Pascualle/COMISIONES"
+)
+
+
+def ejecutar_proceso(carpeta_path: str, carpeta_salida: str | None = None):
 
     if not os.path.exists(carpeta_path):
         raise FileNotFoundError("La carpeta especificada no existe.")
+
+    carpeta_salida = carpeta_salida or CARPETA_SALIDA_DEFAULT
+    if not os.path.exists(carpeta_salida):
+        raise FileNotFoundError(f"La carpeta de salida no existe: {carpeta_salida}")
 
     print("\n🔄 Procesando planillas...\n")
 
@@ -30,10 +44,10 @@ def ejecutar_proceso(carpeta_path: str):
     mes_reporte = MESES[fecha_ref.month]
     anio_reporte = fecha_ref.year
 
-    ruta_reporte_comisiones = os.path.join(carpeta_path, f"Reporte Comisiones {mes_reporte} {anio_reporte}.pdf")
+    ruta_reporte_comisiones = os.path.join(carpeta_salida, f"Reporte Comisiones {mes_reporte} {anio_reporte}.pdf")
     generar_reporte_comisiones_pdf(ruta_reporte_comisiones, df_resumen)
 
-    ruta_distribucion_comisiones = os.path.join(carpeta_path, f"Distribución Comisiones {mes_reporte} {anio_reporte}.pdf")
+    ruta_distribucion_comisiones = os.path.join(carpeta_salida, f"Distribución Comisiones {mes_reporte} {anio_reporte}.pdf")
     generar_distribucion_comisiones_pdf(ruta_distribucion_comisiones, acumulado_vendedores, df_resumen)
 
     print("\n✅ Proceso finalizado correctamente.")
@@ -48,7 +62,9 @@ if __name__ == "__main__":
     else:
         carpeta = input("Ingrese la ruta de la carpeta con las planillas: ").strip()
 
+    carpeta_salida_arg = sys.argv[2] if len(sys.argv) > 2 else None
+
     try:
-        ejecutar_proceso(carpeta)
+        ejecutar_proceso(carpeta, carpeta_salida_arg)
     except Exception as e:
         print(f"\n❌ Error durante el proceso: {e}\n")
