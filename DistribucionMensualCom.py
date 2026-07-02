@@ -127,8 +127,8 @@ def procesar_carpeta_planillas(
         if not archivo.lower().endswith(".pdf"):
             continue
 
-        archivo_low = archivo.lower()
-        if "reporte comisiones" in archivo_low or "distribucion comisiones" in archivo_low:
+        archivo_norm = _normalizar(archivo)
+        if "REPORTE COMISIONES" in archivo_norm or "DISTRIBUCION COMISIONES" in archivo_norm:
             continue
 
         pdf_path = os.path.join(carpeta_path, archivo)

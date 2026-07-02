@@ -41,8 +41,8 @@ def _extraer_cabecera(lineas: list) -> tuple:
     for i, linea in enumerate(lineas):
         linea_up = linea.upper().strip()
 
-        if re.search(r'PLANILLA\s*(N[°º]?\s*\d+|DE\s+COBRANZA)', linea_up):
-            m = re.search(r'N[°º]?\s*(\d+)', linea_up)
+        if re.search(r'PLANILLA\s*(N[°º*]?\s*\d+|DE\s+COBRANZA)', linea_up):
+            m = re.search(r'N[°º*]?\s*(\d+)', linea_up)
             if m:
                 planilla = f"PLANILLA N°{m.group(1)}"
 
