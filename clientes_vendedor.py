@@ -133,8 +133,11 @@ MAPA_CLIENTES_VENDEDORES = MAPA_CLIENTES_DP
 REGLAS_ESPECIALES = {
     "DP": {
         "DAVID ROSENTAL E HIJOS": {"FRAIRE": 0.05},
+        "CASSINA MAURICIO ROGELIO": {"GIUSTA": 0.04, "FRAIRE": 0.04},
     },
-    "FILLS": {},
+    "FILLS": {
+        "CASSINA MAURICIO ROGELIO": {"GIUSTA": 0.04, "FRAIRE": 0.04},
+    },
 }
  
 # ---------------------------------------------------------------------------
